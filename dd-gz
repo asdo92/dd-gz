@@ -1,0 +1,120 @@
+#!/usr/bin/env sh
+
+#####################################
+# dd-gz - dd compressing on the fly #
+#                                   #
+# Author: q3aql@duck.com            #
+# License: GPL v2.0                 #
+data_version=2024-08-10             #
+#####################################
+
+# Check dependencies
+path_check="/usr/bin /bin /usr/local/bin $HOME/.local/bin $(brew --prefix 2> /dev/null)/bin"
+dependencies="dd gzip dirname basename"
+dependencies_found=""
+dependencies_not_found=""
+for checkPath in $path_check ; do
+  for checkDependencies in $dependencies ; do
+    if [ -f $checkPath/$checkDependencies ] ; then
+      dependencies_found="$dependencies_found $checkDependencies"
+    fi
+  done
+done
+for notFound in $dependencies ; do
+  check_found_one=$(echo $dependencies_found | grep " $notFound")
+  check_found_two=$(echo $dependencies_found | grep "$notFound ")
+  if_not_found="$check_found_one$check_found_two"
+  if [ -z "$if_not_found" ] ; then
+    dependencies_not_found="$dependencies_not_found $notFound"
+  fi
+done
+# Show if all tools are installed
+if [ -z "$dependencies_not_found" ] ; then
+  echo > /dev/null
+else
+  echo "$(basename $0): Some required tools are not installed:$dependencies_not_found"
+  exit 1
+fi
+
+# Function to check root permissions
+check_root() {
+  mkdir -p /etc/root 2> /dev/null
+  rootperm=$?
+  if [ $rootperm -eq 0 ] ; then
+    rm -rf /etc/root
+  else
+    echo "$(basename $0): Root permission is required to perform this operation"
+    exit
+  fi
+}
+
+help() {
+  echo "$(basename $0) - dd compressing on the fly ($data_version)"
+  echo "Syntax backup: $(basename $0) backup /dev/<device> /path/<output>.gz"
+  echo "Syntax restore: $(basename $0) restore /path/<input>.gz /dev/<device>"
+  exit 1
+}
+
+create_backup() {
+  check_root
+  device_input=$1
+  output_file=$2
+  if [ -z "$device_input" ] ; then
+    echo "$(basename $0): No input device entered"
+    exit 1
+  fi
+  if [ ! -e "$device_input" ] ; then
+    echo "$(basename $0): Device $device_input was not found"
+    exit 1
+  fi
+  if [ -z $output_file ] ; then
+    echo "$(basename $0): No output file entered"                                                                                                                                                                   
+    exit 1
+  fi
+  dir_output_file=$(dirname $output_file)
+  if [ ! -d "$dir_output_file" ] ; then
+    echo "$(basename $0): Directory $dir_output_file was not found"
+    exit 1
+  fi
+  echo "$(basename $0) is running backup"
+  echo "Device: $device_input"
+  echo "Output: $output_file"
+  dd if="$device_input" status=progress | gzip -9 > "$output_file"
+}
+
+restore_backup() {
+  check_root
+  input_file=$1
+  device_output=$2
+  if [ -z "$input_file" ] ; then
+    echo "$(basename $0): No input file entered"
+    exit 1
+  fi
+  if [ ! -f "$input_file" ] ; then
+    echo "$(basename $0): Input file $input_file was not found"
+    exit 1
+  fi
+  if [ -z "$device_output" ] ; then
+    echo "$(basename $0): No output device entered"
+    exit 1
+  fi
+  if [ ! -e "$device_output" ] ; then
+    echo "$(basename $0): Device $device_output was not found"
+    exit 1
+  fi
+  echo "$(basename $0) is restoring backup"
+  echo "Input: $input_file"
+  echo "Device: $device_output"
+  gzip -d -k -c "$input_file" | dd of="$device_output" status=progress
+}
+
+# Main
+if [ -z $1 ] ; then
+  help
+elif [ "$1" = "backup" ] ; then
+ create_backup "$2" "$3" 
+elif [ "$1" = "restore" ] ; then
+ restore_backup "$2" "$3"
+else
+  help
+fi
