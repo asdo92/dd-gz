@@ -79,7 +79,7 @@ create_backup() {
   echo "$(basename $0) is running backup"
   echo "Device: $device_input"
   echo "Output: $output_file"
-  dd if="$device_input" status=progress | gzip -9 > "$output_file"
+  dd if="$device_input" bs=1M status=progress | gzip -9 > "$output_file"
 }
 
 restore_backup() {
@@ -105,7 +105,7 @@ restore_backup() {
   echo "$(basename $0) is restoring backup"
   echo "Input: $input_file"
   echo "Device: $device_output"
-  gzip -d -k -c "$input_file" | dd of="$device_output" status=progress
+  gzip -d -k -c "$input_file" | dd of="$device_output" bs=1M status=progress
 }
 
 # Main
